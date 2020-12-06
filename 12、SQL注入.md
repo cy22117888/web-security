@@ -135,3 +135,84 @@ SQL注入：
 #### 局限性：
 * 回显通常为单一结果，因此只能看到第一条sql语句的执行结果；
 * 使用堆叠注入前，我们需要预先知道一些数据库相关信息。 如：表名、列名...
+
+### OOB注入： 带外通道技术 
+#### 定义：
+* DNS信道的迭代查询。
+* 通过其他信道来获取数据。
+
+#### 前提条件：
+* 存在漏洞的系统  		
+* 外围防火墙的出站请求	
+
+#### 前期准备：
+* 我们自己的服务器
+* CEYE平台（用于监控请求）
+
+#### 预备知识： 
+
+* DNS 协议： Domain Name System
+	* 将 域名 与 IP地址 建立映射关系的一个分布式数据库
+	* 使用TCP 和 UDP 端口53
+	* 每级域名限长 63 个字符，域名总限长 253 个字符。
+
+* DNS 迭代查询原理：
+	* 拥有一个域名；
+	* 通过代理商设置 该域名 的 nameserver 为自己服务器的 IP；  --建立 域名与 IP 的映射
+	* 在自己的服务器上搭建 DNS Server
+	* 至此： 该域名及其子域名的查询都会推送到这台服务器上，同时这台服务器也能实时监控针对该域名的查询请求。
+
+* DNS 查询流程： 用于 -> 本地 DNS 服务器 -> 根 DNS 服务器 -> 顶级 DNS 服务器 -> 权威 DNS 服务器
+	* 根服务器：  13台（13个IP）
+	* 顶级服务器： 对应一个顶级域名，如： com/net/org/cn/edu...
+	* 权威服务器： 对应二级域名，如： qq.com/yahoo.com...    --注： 实际上二级域名就对应着具体的公司。
+	* 还有很多子域名： www.qq.com/im.qq.com...
+
+* 泛域名解析： 利用通配符的方式将所有的 次级域名 指向 同一个IP
+	* 如： www.example.com 与 abc.example.com 都会访问到同一个站点。
+	* 实现步骤： 配置域名解析时，在DNS服务器中配置如下记录： *.example.com 	-> 	IP
+
+* tcpdump
+	* 基于 Unix 系统的命令行数据包嗅探工具，可以抓取流动在网卡上的数据包。
+
+* UNC 路径
+	* 通用命名规则
+	* Windows 主机默认存在， Linux 主机默认不存在
+	* 格式： \\servername\sharename  	(\\服务器名\共享资源名)
+	* 打印机、网络共享文件夹时，都会用到 UNC 填写地址。<br>
+	  当我们使用 UNC 路径时，会对域名进行 DNS 解析<br>
+
+* CEYE 平台
+	* 用途： 可以监控 DNS 请求，并且配置了泛域名解析。
+	* 使用步骤：
+		* 注册 CEYE平台 账号（cete.io）
+		* 登录平台，在 profile 页面可以看到分配给你的域名
+
+### 混淆注入：（绕过WAF）
+针对WAF（防火墙）<br>
+#### 绕过类型的分类：
+* 大小写绕过
+	* 原理： 有些 sql 关键字会在发送请求时被过滤处理掉（简单的被替换为空）：<br>
+			但 sql 语句是大小写不敏感的，当我们通过改变字符大小写来传递参数时，就可能不被过滤，从而实现攻击的目的<br>
+* and/or 绕过：
+	* 原理： 在请求时通过 符号 来替换 and or，来达到绕过的目的<br>
+			and -> && 		or -> || 	<br>
+* union 绕过：
+	* 原理： 使用 || 来拼接 select 语句，达到 union 的功能。
+* where 绕过：
+	* 原理： 使用 limit 来替代 where
+	* 示例：<br>
+			select * from test where id = 1;<br>
+			select * from test limit 0, 1;<br>
+* limit 绕过：
+	* 原理： 使用 group by 与 having 的组合来达到绕过的目的
+	* 示例：<br>
+			select name from test where id = 1 limit 1;<br>
+			select id, min(name) from test group by id having id = 1;<br>
+* group by 绕过：
+	* 原理： 使用 group_concat 替换。
+* select 及 单引号 绕过：
+	* 原理： 使用 substr() 与 16进制数值 替换。<br>
+			select -> substr()		目标字符 -> 16进制数值	<br>
+* hex/unhex/substr 绕过：
+	* 原理： 使用 binara() 替换。
