@@ -216,3 +216,63 @@ SQL注入：
 			select -> substr()		目标字符 -> 16进制数值	<br>
 * hex/unhex/substr 绕过：
 	* 原理： 使用 binara() 替换。
+* 空格 绕过：
+	* 原理： 使用 注释符号 来替代空格。<br>
+    * 示例： 
+    		select name from test;<br>
+    		select/**/name/**/from/**/test;<br>
+
+* = 绕过：
+	* 原理： 使用 like 替换 =
+* 双写 绕过：
+	* 原理： 使用 双写敏感关键字 的方式，来绕过关键字置空。
+	* 示例：<br>
+			union select 1,2,3,4,5			--union 被过滤置空<br>
+			uniunionon select 1,2,3,4,5 	--中间的完整union被置空后，还会拼凑出一个union<br>
+* 双重编码 绕过：
+* 宽字节 绕过：
+* 二次注入：
+	* 原理： 来自数据库的输入同样不可信。
+	* 示例：<br>
+		当前端在注册账号时，账号为 admin'# <br>
+		那么在进行其他的sql操作时，where条件就会变为 name = admin,后面的会被 # 注释掉<br>
+	 		
+	 	注册时：<br> 
+	 		username = admin'#		password = 123<br>
+	 	登录后，进行修改密码操作：<br>
+	 		123 -> 456<br>
+	 	预期执行语句：<br>
+	 		update xxx set password='456' where username='admin'# and password='123';<br>
+	 	实际执行语句：<br>
+	 		update xxx set password='456' where username='admin'	--利用#注释掉后面的条件<br>
+	 	所以，实际被修改密码的用户是 admin ，而不是admin'#。		达到篡改密码的目的<br>
+
+### 防御方式：
+* 代码与数据分离: 预编译（推荐）
+* 禁止用护账号出现 特殊符号	
+
+## 3、高级
+### 自动化注入：
+#### 原理： 依托工具来实现自动的sql注入
+#### 工具介绍： 
+##### sqlmap
+* 集成了多种数据库识别及注入方式
+* 多用于识别和利用Web应用程序注入漏洞的工具
+* 优点：
+	* 集成了大量的payload
+	* 对检测与利用的自动化处理
+* 特性： 
+	* 对大部分DBMS的全面支持
+	* 对六种sql注入技巧的全面支持
+	* 直连数据库
+	* 支持枚举功能
+	* 支持密码hash
+	* 支持dump数据
+	* ...
+
+##### FuzzDB + Burp
+* FuzzDB: 一个开源的应用程序模糊测试数据库。
+* 使用步骤：
+	* 使用 Burp 拦截请求；
+	* 加载指定的 FuzzDB 的攻击字典；
+	* 执行请求，实现自动化注入。
